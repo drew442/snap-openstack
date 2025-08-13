@@ -48,6 +48,7 @@ from sunbeam.steps.openstack import (
     database_topology_questions,
     region_questions,
 )
+from sunbeam.core.deployment import NETWORK_ISOLATION_KEY
 
 LOG = logging.getLogger(__name__)
 LOCAL_TYPE = "local"
@@ -308,11 +309,28 @@ class LocalDeployment(Deployment):
         return proxy
 
     def get_space(self, network: Networks) -> str:
-        """Get space associated to network.
+        """Return space name for a role; default to 'management' if not isolated or role missing."""
+        try:
+            cfg = load_answers(self.get_client(), NETWORK_ISOLATION_KEY) or {}
+        except Exception:
+            cfg = {}
+        ni = cfg.get("network_isolation") or {}
+        if not ni.get("enable_isolation"):
+            return "management"
 
-        Local deployment only supports management space as of now.
-        """
-        return "management"
+        spaces = (ni.get("spaces") or {})
+        role_to_key = {
+            Networks.MANAGEMENT: "management",
+            Networks.INTERNAL: "internal",
+            Networks.PUBLIC: "public",
+            Networks.STORAGE: "storage",
+            Networks.STORAGE_CLUSTER: "storage-cluster",
+            Networks.DATA: "data",
+        }
+        key = role_to_key.get(network)
+        if not key:
+            return "management"
+        return key if key in spaces else "management"
 
     @property
     def internal_ip_pool(self) -> str:

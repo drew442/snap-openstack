@@ -29,7 +29,7 @@ from sunbeam.core.common import (
     update_config,
     validate_cidr_or_ip_ranges,
 )
-from sunbeam.core.deployment import Deployment, Networks
+from sunbeam.core.deployment import Deployment, Networks, NETWORK_ISOLATION_KEY,
 from sunbeam.core.juju import (
     ActionFailedException,
     ApplicationNotFoundException,
@@ -144,7 +144,21 @@ def k8s_addons_questions():
             description=LOADBALANCER_QUESTION_DESCRIPTION,
         ),
     }
-
+def k8s_isolation_lb_questions():
+    return {
+        "lb_public_pool": PromptQuestion(
+            "MetalLB PUBLIC IP ranges (Traefik public & RGW)",
+            default_value="",
+            validation_function=validate_cidr_or_ip_ranges,
+            description=LOADBALANCER_QUESTION_DESCRIPTION,
+        ),
+        "lb_internal_pool": PromptQuestion(
+            "MetalLB INTERNAL IP ranges (Traefik internal)",
+            default_value="",
+            validation_function=validate_cidr_or_ip_ranges,
+            description=LOADBALANCER_QUESTION_DESCRIPTION,
+        ),
+    }
 
 def endpoint_questions():
     return {
@@ -251,8 +265,28 @@ class DeployK8SApplicationStep(DeployMachineApplicationStep):
         self.variables["k8s-addons"]["loadbalancer"] = (
             k8s_addons_bank.loadbalancer.ask()
         )
-        write_answers(self.client, self._ADDONS_CONFIG, self.variables)
+        ni = load_answers(self.client, NETWORK_ISOLATION_KEY) or {}
+        enable_iso = bool((ni or {}).get("enable_isolation"))
+        if enable_iso:
+            iso_bank = QuestionBank(
+                questions=k8s_isolation_lb_questions(),
+                console=console,  # type: ignore
+                preseed={},  # (optional) wire manifest preseed later if desired
+                previous_answers=self.variables.get("k8s-addons", {}),
+                accept_defaults=self.accept_defaults,
+                show_hint=show_hint,
+            )
+            pub = iso_bank.lb_public_pool.ask()
+            internal = iso_bank.lb_internal_pool.ask()
+            if pub:
+                self.variables["k8s-addons"]["lb_public_pool"] = pub
+            if internal:
+                self.variables["k8s-addons"]["lb_internal_pool"] = internal
+            both = ",".join([v for v in (pub, internal) if v])
+            if both:
+                self.variables["k8s-addons"]["loadbalancer"] = both
 
+        write_answers(self.client, self._ADDONS_CONFIG, self.variables)
         # Traefik endpoints prompt
         self.traefik_variables = load_answers(self.client, self._TRAEFIK_CONFIG_KEY)
         self.traefik_variables.setdefault("traefik-endpoints", {})

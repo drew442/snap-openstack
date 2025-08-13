@@ -149,6 +149,7 @@ from sunbeam.steps.k8s import (
     StoreK8SKubeConfigStep,
     UpdateK8SCloudStep,
 )
+from sunbeam.steps.k8s_isolation import EnsureMetalLBIsolationStep
 from sunbeam.steps.microceph import (
     AddMicrocephUnitsStep,
     CheckMicrocephDistributionStep,
@@ -175,6 +176,7 @@ from sunbeam.utils import (
     CatchGroup,
     click_option_show_hints,
 )
+from sunbeam.steps.k8s_isolation import EnsureMetalLBIsolationStep
 
 LOG = logging.getLogger(__name__)
 console = Console()
@@ -282,6 +284,7 @@ def get_k8s_plans(
             StoreK8SKubeConfigStep(
                 deployment, client, jhelper, deployment.openstack_machines_model
             ),
+            EnsureMetalLBIsolationStep(client, model=deployment.openstack_machines_model),
             EnsureK8SUnitsTaggedStep(
                 deployment,
                 client,

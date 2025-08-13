@@ -210,7 +210,90 @@ if [ $? -ne 0 ]; then
     echo "Juju bootstrap complete, you can now bootstrap sunbeam!"
 fi
 """
+NETWORK_ISOLATION_TEMPLATE = r"""
+# === Configure Juju spaces for network isolation (requires Netplan applied) ===
+JSON=/var/snap/openstack/common/network-isolation.json
+if [ ! -f "$JSON" ]; then
+  echo "Skipping network isolation: $JSON not found."
+else
+  echo "Configuring Juju spaces from $JSON"
+  python3 - <<'PY'
+import json, subprocess, sys
+from ipaddress import ip_network
 
+def sh(*args, check=True):
+    return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
+
+with open("/var/snap/openstack/common/network-isolation.json") as f:
+    cfg = json.load(f)
+
+if not cfg.get("enable_isolation"):
+    print("enable_isolation=false; nothing to do"); sys.exit(0)
+
+spaces = cfg.get("spaces") or {}
+if not spaces:
+    print("No spaces in config; nothing to do"); sys.exit(0)
+
+# Validate interfaces exist and subnets are valid & non-overlapping
+seen = []
+def overlaps_any(n):
+    for p in seen:
+        if n.overlaps(p): return p
+    return None
+
+for name, spec in spaces.items():
+    if not isinstance(spec, dict): continue
+    ifname = spec.get("ifname")
+    subs   = spec.get("subnets") or []
+    if not ifname or not subs:
+        print(f"Skipping {name}: missing ifname/subnets"); continue
+    chk = subprocess.run(["ip","-o","link","show",ifname], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if chk.returncode != 0:
+        print(f"ERROR: interface {ifname} for space {name} not found"); sys.exit(1)
+    nets = []
+    for s in subs:
+        try:
+            n = ip_network(s, strict=True)
+        except Exception:
+            print(f"ERROR: invalid CIDR {s} for space {name}"); sys.exit(1)
+        ov = overlaps_any(n)
+        if ov:
+            print(f"ERROR: subnet {n} in {name} overlaps with {ov}"); sys.exit(1)
+        nets.append(n)
+    seen.extend(nets)
+
+# Add/update controller-scoped spaces
+existing = set()
+try:
+    out = sh("juju","spaces","--format","json").stdout
+    import json as _j
+    existing = {s["name"] for s in _j.loads(out).get("spaces", [])}
+except Exception:
+    pass
+
+for name, spec in spaces.items():
+    subnets = (spec or {}).get("subnets") or []
+    if not subnets: continue
+    if name in existing:
+        try:
+            sh("juju","set-space-subnets", name, *subnets)
+            print(f"Updated Juju space {name} with subnets: {', '.join(subnets)}")
+        except Exception:
+            print(f"NOTE: set-space-subnets not supported or failed for {name}; continuing")
+    else:
+        sh("juju","add-space", name, *subnets)
+        print(f"Added Juju space {name}: {', '.join(subnets)}")
+
+# Set default space
+try:
+    sh("juju","model-default","default-space=management")
+except Exception:
+    pass
+
+print("Juju spaces configured.")
+PY
+fi
+"""
 
 @click.command()
 @click.option(
@@ -226,6 +309,12 @@ fi
     help="Prepare the node for use as a client.",
     default=False,
 )
+@click.option(
+    "--with-network-isolation",
+    is_flag=True,
+    help="After Juju bootstrap, create/update Juju spaces from /var/snap/openstack/common/network-isolation.json",
+    default=False,
+)
 def prepare_node_script(bootstrap: bool = False, client: bool = False) -> None:
     """Generate script to prepare a node for Sunbeam use."""
     if bootstrap and client:
@@ -236,4 +325,6 @@ def prepare_node_script(bootstrap: bool = False, client: bool = False) -> None:
     script += COMMON_TEMPLATE
     if bootstrap:
         script += BOOTSTRAP_TEMPLATE
+        if with_network_isolation:
+            script += NETWORK_ISOLATION_TEMPLATE
     console.print(script, soft_wrap=True)
