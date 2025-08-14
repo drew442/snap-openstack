@@ -29,7 +29,7 @@ from sunbeam.core.common import (
     update_config,
     validate_cidr_or_ip_ranges,
 )
-from sunbeam.core.deployment import Deployment, Networks, NETWORK_ISOLATION_KEY,
+from sunbeam.core.deployment import Deployment, Networks, NETWORK_ISOLATION_KEY
 from sunbeam.core.juju import (
     ActionFailedException,
     ApplicationNotFoundException,
