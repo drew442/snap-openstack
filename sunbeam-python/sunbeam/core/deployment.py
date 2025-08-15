@@ -45,6 +45,7 @@ else:
 
 LOG = logging.getLogger(__name__)
 PROXY_CONFIG_KEY = "ProxySettings"
+NETWORK_ISOLATION_KEY = "network_isolation"
 
 _cls_registry: dict[str, Type["Deployment"]] = {}
 
