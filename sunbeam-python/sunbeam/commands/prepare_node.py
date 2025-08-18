@@ -315,7 +315,7 @@ fi
     help="After Juju bootstrap, create/update Juju spaces from /var/snap/openstack/common/network-isolation.json",
     default=False,
 )
-def prepare_node_script(bootstrap: bool = False, client: bool = False) -> None:
+def prepare_node_script(bootstrap: bool = False, client: bool = False, with_network_isolation: bool = False,) -> None:
     """Generate script to prepare a node for Sunbeam use."""
     if bootstrap and client:
         raise click.UsageError("Cannot prepare node as both client and bootstrap")
