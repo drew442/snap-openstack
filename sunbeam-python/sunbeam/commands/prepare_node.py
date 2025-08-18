@@ -211,18 +211,15 @@ if [ $? -ne 0 ]; then
 fi
 """
 NETWORK_ISOLATION_TEMPLATE = r"""
-# === Configure Juju spaces for network isolation (requires Netplan applied) ===
+# === Validate network isolation config (Juju spaces are created during cluster bootstrap) ===
 JSON=/var/snap/openstack/common/network-isolation.json
 if [ ! -f "$JSON" ]; then
   echo "Skipping network isolation: $JSON not found."
 else
-  echo "Configuring Juju spaces from $JSON"
+  echo "Validating network isolation from $JSON"
   python3 - <<'PY'
 import json, subprocess, sys
 from ipaddress import ip_network
-
-def sh(*args, check=True):
-    return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
 
 with open("/var/snap/openstack/common/network-isolation.json") as f:
     cfg = json.load(f)
@@ -244,7 +241,7 @@ def overlaps_any(n):
 for name, spec in spaces.items():
     if not isinstance(spec, dict): continue
     ifname = spec.get("ifname")
-    subs   = spec.get("subnets") or []
+    subs   = (spec.get("subnets") or [])
     if not ifname or not subs:
         print(f"Skipping {name}: missing ifname/subnets"); continue
     chk = subprocess.run(["ip","-o","link","show",ifname], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -262,35 +259,7 @@ for name, spec in spaces.items():
         nets.append(n)
     seen.extend(nets)
 
-# Add/update controller-scoped spaces
-existing = set()
-try:
-    out = sh("juju","spaces","--format","json").stdout
-    import json as _j
-    existing = {s["name"] for s in _j.loads(out).get("spaces", [])}
-except Exception:
-    pass
-
-for name, spec in spaces.items():
-    subnets = (spec or {}).get("subnets") or []
-    if not subnets: continue
-    if name in existing:
-        try:
-            sh("juju","set-space-subnets", name, *subnets)
-            print(f"Updated Juju space {name} with subnets: {', '.join(subnets)}")
-        except Exception:
-            print(f"NOTE: set-space-subnets not supported or failed for {name}; continuing")
-    else:
-        sh("juju","add-space", name, *subnets)
-        print(f"Added Juju space {name}: {', '.join(subnets)}")
-
-# Set default space
-try:
-    sh("juju","model-default","default-space=management")
-except Exception:
-    pass
-
-print("Juju spaces configured.")
+print("Validation OK. Spaces will be created after models are created in cluster bootstrap.")
 PY
 fi
 """

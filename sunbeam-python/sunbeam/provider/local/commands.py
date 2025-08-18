@@ -177,6 +177,7 @@ from sunbeam.utils import (
     click_option_show_hints,
 )
 from sunbeam.steps.k8s_isolation import EnsureMetalLBIsolationStep
+from sunbeam.steps.juju_spaces import EnsureJujuSpacesStep
 
 LOG = logging.getLogger(__name__)
 console = Console()
@@ -238,6 +239,7 @@ def get_sunbeam_machine_plans(
     plans.extend(
         [
             TerraformInitStep(sunbeam_machine_tfhelper),
+            EnsureJujuSpacesStep(client, model=deployment.openstack_machines_model),
             DeploySunbeamMachineApplicationStep(
                 deployment,
                 client,
@@ -271,6 +273,7 @@ def get_k8s_plans(
     plans.extend(
         [
             TerraformInitStep(k8s_tfhelper),
+            EnsureJujuSpacesStep(client, model=deployment.openstack_machines_model),
             DeployK8SApplicationStep(
                 deployment,
                 client,
