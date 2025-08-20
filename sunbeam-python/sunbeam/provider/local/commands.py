@@ -346,7 +346,7 @@ def get_juju_controller_plans(
                 deployment.name, "empty-creds", credential_definition, controller
             ),
             BackupBootstrapUserStep("admin", data_location),
-            ClusterUpdateJujuControllerStep(client, controller, False, False),
+            ClusterUpdateJujuControllerStep(client, controller, False),
             SaveJujuAdminUserLocallyStep(controller, data_location),
         ]
 
@@ -426,7 +426,7 @@ def get_juju_migrate_plans(
             from_controller,
             to_controller,
         ),
-        ClusterUpdateJujuControllerStep(client, deployment.controller, False, False),
+        ClusterUpdateJujuControllerStep(client, deployment.controller, False),
         SaveJujuAdminUserLocallyStep(deployment.controller, data_location),
     ]
 
@@ -942,6 +942,13 @@ def configure_sriov(
     deployment: LocalDeployment = ctx.obj
     client = deployment.get_client()
     fqdn = utils.get_fqdn()
+
+    node = client.cluster.get_node_info(fqdn)
+
+    if "compute" not in node["role"]:
+        LOG.info("SR-IOV can only be configured on compute nodes.")
+        return
+
     manifest = deployment.get_manifest(manifest_path)
     jhelper = JujuHelper(deployment.juju_controller)
 
