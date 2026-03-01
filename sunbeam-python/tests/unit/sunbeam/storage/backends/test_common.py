@@ -97,11 +97,15 @@ class BaseBackendTests:
 
     def test_config_has_san_ip_field(self, backend):
         """Test that config has san_ip field."""
+        if backend.backend_type == "lvm-san":
+            return
         config_class = backend.config_type()
         assert "san_ip" in config_class.model_fields
 
     def test_config_has_protocol_field(self, backend):
         """Test that config has protocol field."""
+        if backend.backend_type == "lvm-san":
+            return
         config_class = backend.config_type()
         # Protocol field should exist
         assert "protocol" in config_class.model_fields
@@ -157,10 +161,10 @@ class TestAllBackends(BaseBackendTests):
 
 
 def test_all_backends_have_unique_types(
-    hitachi_backend, purestorage_backend, dellsc_backend
+    hitachi_backend, purestorage_backend, dellsc_backend, lvmsan_backend
 ):
     """Test that all backends have unique type identifiers."""
-    backends = [hitachi_backend, purestorage_backend, dellsc_backend]
+    backends = [hitachi_backend, purestorage_backend, dellsc_backend, lvmsan_backend]
     types = [b.backend_type for b in backends]
 
     # Check no duplicates
@@ -168,10 +172,10 @@ def test_all_backends_have_unique_types(
 
 
 def test_all_backends_have_unique_charm_names(
-    hitachi_backend, purestorage_backend, dellsc_backend
+    hitachi_backend, purestorage_backend, dellsc_backend, lvmsan_backend
 ):
     """Test that all backends have unique charm names."""
-    backends = [hitachi_backend, purestorage_backend, dellsc_backend]
+    backends = [hitachi_backend, purestorage_backend, dellsc_backend, lvmsan_backend]
     charm_names = [b.charm_name for b in backends]
 
     # Check no duplicates
@@ -186,6 +190,7 @@ def test_all_backends_have_unique_charm_names(
         ("hitachi", "hitachi"),
         ("purestorage", "purestorage"),
         ("dellsc", "dellsc"),
+        ("lvm-san", "lvm-san"),
     ],
 )
 def test_backend_types_match_expected(any_backend, backend_type, expected_type):
@@ -200,6 +205,7 @@ def test_backend_types_match_expected(any_backend, backend_type, expected_type):
         ("hitachi", "cinder-volume-hitachi"),
         ("purestorage", "cinder-volume-purestorage"),
         ("dellsc", "cinder-volume-dellsc"),
+        ("lvm-san", "cinder-volume-lvm-san"),
     ],
 )
 def test_backend_charm_names_match_expected(any_backend, backend_type, expected_charm):
