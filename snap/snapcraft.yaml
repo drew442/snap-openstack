@@ -1,7 +1,13 @@
 name: openstack
+title: OpenStack
 base: core24
 summary: Dead simple OpenStack installation
 license: Apache-2.0
+contact: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
+issues: https://github.com/canonical/snap-openstack/issues
+source-code: https://github.com/canonical/snap-openstack
+website: https://canonical-openstack.readthedocs-hosted.com/
+donation: https://ubuntu.com/open-source
 description: |
   snap-openstack aims to provide a scalable, simple to deploy OpenStack solution.
 version: "2024.1"
